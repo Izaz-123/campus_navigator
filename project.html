@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus Navigator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 300px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input {
+            margin-bottom: 15px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #result {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #333;
+        }
+
+        #map {
+            margin-top: 20px;
+            width: 600px;
+            height: 600px;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+    </style>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Campus Navigator</h1>
+        <form id="navigator-form">
+            <label for="start">Enter starting position:</label>
+            <input type="text" id="start" name="start" required>
+
+            <label for="end">Enter ending position:</label>
+            <input type="text" id="end" name="end" required>
+
+            <button type="submit">Find Shortest Path</button>
+        </form>
+        <div id="result"></div>
+    </div>
+    <div id="map"></div>
+    <script>
+        document.getElementById('navigator-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            const start = document.getElementById('start').value;
+            const end = document.getElementById('end').value;
+            
+            // Define the campus map
+            const campusMap = new CampusMap();
+
+            // Add nodes
+            const blocks = ["Block 25", "Block 26", "Block 27", "Block 28", "Block 29", "Block 30", "Block 31", "Block 32", "Block 33", "Block 34", "Block 35", "Block 36", "Block 37", "Block 38"];
+            blocks.forEach(block => campusMap.addNode(block));
+
+            // Add edges
+            campusMap.addEdge("Block 25", "Block 26");
+            campusMap.addEdge("Block 26", "Block 27");
+            campusMap.addEdge("Block 27", "Block 28");
+            campusMap.addEdge("Block 28", "Block 29");
+            campusMap.addEdge("Block 29", "Block 30");
+            campusMap.addEdge("Block 30", "Block 31");
+            campusMap.addEdge("Block 31", "Block 32");
+            campusMap.addEdge("Block 32", "Block 33");
+            campusMap.addEdge("Block 33", "Block 34");
+            campusMap.addEdge("Block 35", "Block 36");
+            campusMap.addEdge("Block 36", "Block 37");
+            campusMap.addEdge("Block 37", "Block 38");
+            campusMap.addEdge("Block 38", "Block 26");
+            campusMap.addEdge("Block 35", "Block 33");
+
+            const path = campusMap.shortestPath(start, end);
+            
+            if (path.length > 0) {
+                document.getElementById('result').innerText = `Shortest path from ${start} to ${end}: ${path.join(' -> ')}`;
+                drawMap(campusMap, path);
+            } else {
+                document.getElementById('result').innerText = `No path found from ${start} to ${end}`;
+            }
+        });
+
+        // Function to draw the map and path
+        function drawMap(campusMap, path) {
+            const width = 600;
+            const height = 600;
+            const nodes = Object.keys(campusMap.adjacencyList).map(name => ({ name }));
+            const links = [];
+
+            Object.keys(campusMap.adjacencyList).forEach(node => {
+                campusMap.adjacencyList[node].forEach(neighbor => {
+                    links.push({ source: node, target: neighbor });
+                });
+            });
+
+            const svg = d3.select('#map').html('').append('svg')
+                .attr('width', width)
+                .attr('height', height);
+
+            const simulation = d3.forceSimulation(nodes)
+                .force('link', d3.forceLink(links).id(d => d.name).distance(50))
+                .force('charge', d3.forceManyBody().strength(-200))
+                .force('center', d3.forceCenter(width / 2, height / 2));
+
+            const link = svg.append('g')
+                .attr('class', 'links')
+                .selectAll('line')
+                .data(links)
+                .enter().append('line')
+                .attr('stroke-width', 2)
+                .attr('stroke', '#999');
+
+            const node = svg.append('g')
+                .attr('class', 'nodes')
+                .selectAll('circle')
+                .data(nodes)
+                .enter().append('circle')
+                .attr('r', 10)
+                .attr('fill', d => path.includes(d.name) ? 'red' : '#007bff');
+
+            const text = svg.append('g')
+                .attr('class', 'texts')
+                .selectAll('text')
+                .data(nodes)
+                .enter().append('text')
+                .attr('dx', 12)
+                .attr('dy', '.35em')
+                .text(d => d.name);
+
+            simulation.on('tick', () => {
+                link
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+
+                node
+                    .attr('cx', d => d.x)
+                    .attr('cy', d => d.y);
+
+                text
+                    .attr('x', d => d.x)
+                    .attr('y', d => d.y);
+            });
+        }
+
+        // Class definitions
+        class Node {
+            constructor(name) {
+                this.name = name;
+            }
+        }
+
+        class CampusMap {
+            constructor() {
+                this.adjacencyList = {};
+                this.nodes = {};
+            }
+
+            addNode(name) {
+                if (!this.nodes[name]) {
+                    this.nodes[name] = new Node(name);
+                    this.adjacencyList[name] = [];
+                }
+            }
+
+            addEdge(node1, node2) {
+                this.adjacencyList[node1].push(node2);
+                this.adjacencyList[node2].push(node1);
+            }
+
+            shortestPath(start, end) {
+                const visited = {};
+                const parent = {};
+                const queue = [];
+
+                Object.keys(this.nodes).forEach(node => {
+                    visited[node] = false;
+                });
+
+                visited[start] = true;
+                queue.push(start);
+
+                while (queue.length > 0) {
+                    const current = queue.shift();
+
+                    for (let neighbor of this.adjacencyList[current]) {
+                        if (!visited[neighbor]) {
+                            visited[neighbor] = true;
+                            parent[neighbor] = current;
+                            queue.push(neighbor);
+
+                            if (neighbor === end) {
+                                const path = [];
+                                let step = end;
+                                while (step !== start) {
+                                    path.push(step);
+                                    step = parent[step];
+                                }
+                                path.push(start);
+                                return path.reverse();
+                            }
+                        }
+                    }
+                }
+
+                return [];
+            }
+        }
+    </script>
+</body>
+</html>
